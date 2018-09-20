@@ -16,6 +16,7 @@ MIN_SPEED = 1
 MAX_SPEED = 100
 GAME = Life(WIDTH // CELL_SIZE, HEIGHT // CELL_SIZE)
 
+
 class SettingReminder:
 
     def __init__(self, value: int, speed_setter):
