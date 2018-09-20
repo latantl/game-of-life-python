@@ -1,63 +1,64 @@
-from src.event import Event
+from event import Event
+
 
 class Cell:
 
-    def __init__(self, alive = 0):
-        self.wasalive = self.isalive = alive
-        self.neighbours = []
-        self.bornevent = Event()
-        self.diedevent = Event()
+    def __init__(self, alive=0):
+        self.was_alive: int = alive
+        self.is_alive: int = alive
+        self.i: int = None
+        self.j: int = None
+        self.neighbours: [Cell] = []
+        self.born_event = Event()
+        self.died_event = Event()
 
-    def switch(self):
-        if self.isalive == 0:
-            self.isalive = self.wasalive = 1
-            self.bornevent.fire(self)
+    def switch(self) -> None:
+        if self.is_alive == 0:
+            self.born()
         else:
-            self.isalive = self.wasalive = 0
-            self.diedevent.fire(self)
+            self.die()
 
-    def update(self):
-        a = sum(n.wasalive for n in self.neighbours)
-        if self.wasalive and (a < 2 or a > 3):
-            self.isalive = 0
-            self.diedevent.fire(self)
-            return True
+    def update(self) -> None:
+        a = sum(n.was_alive for n in self.neighbours)
+        if self.was_alive and not 2 <= a <= 3:
+            self.is_alive = 0
+            self.died_event.fire(self)
         elif a == 3:
-            self.isalive = 1
-            self.bornevent.fire(self)
-            return True
-        return False
+            self.is_alive = 1
+            self.born_event.fire(self)
 
-    def update_ended(self):
-        self.wasalive = self.isalive
+    def update_ended(self) -> None:
+        self.was_alive = self.is_alive
 
-    def die(self):
-        self.isalive = 0
-        self.wasalive = 0
-        self.diedevent.fire(self)
+    def die(self) -> None:
+        self.is_alive = 0
+        self.was_alive = 0
+        self.died_event.fire(self)
 
-    def born(self):
-        self.wasalive = 0
-        self.isalive = 1
-        self.bornevent.fire(self)
+    def born(self) -> None:
+        self.is_alive = 1
+        self.was_alive = 1
+        self.born_event.fire(self)
+
 
 class Life:
-    def __init__(self, nrow, ncolumn):
-        self.nrow = nrow
-        self.ncolumn = ncolumn
-        self.isrunning = False
-        self.cells = [[Cell() for x in range(ncolumn)] for y in range(nrow)]
-        self.buildconnections()
 
-    def buildconnections(self):
-        for i in range(self.nrow):
-            for j in range(self.ncolumn):
+    def __init__(self, nrow: int, ncolumn: int):
+        self.row_count: int = nrow
+        self.column_count: int = ncolumn
+        self.is_running: bool = False
+        self.cells: [[Cell]] = [[Cell() for x in range(ncolumn)] for y in range(nrow)]
+        self.build_neighbourhoods()
+
+    def build_neighbourhoods(self) -> None:
+        for i in range(self.row_count):
+            for j in range(self.column_count):
                 self.cells[i][j].j = j
                 self.cells[i][j].i = i
-                u = (i - 1) % self.nrow
-                d = (i + 1) % self.nrow
-                r = (j + 1) % self.ncolumn
-                l = (j - 1) % self.ncolumn
+                u = (i - 1) % self.row_count
+                d = (i + 1) % self.row_count
+                r = (j + 1) % self.column_count
+                l = (j - 1) % self.column_count
                 self.cells[i][j].neighbours.append(self.cells[u][j])
                 self.cells[i][j].neighbours.append(self.cells[d][j])
                 self.cells[i][j].neighbours.append(self.cells[i][r])
@@ -67,15 +68,23 @@ class Life:
                 self.cells[i][j].neighbours.append(self.cells[d][r])
                 self.cells[i][j].neighbours.append(self.cells[d][l])
 
-    def update(self):
-        updated = False
+    def for_all_cells(self, func) -> None:
+        # to call a method on every cell without a parameter
         for row in self.cells:
             for c in row:
-                if c.update():
-                    updated = True
+                func(c)
+
+    def are_cells_consistent(self) -> bool:
         for row in self.cells:
             for c in row:
-                c.update_ended()
+                if c.is_alive != c.was_alive:
+                    return False
+        return True
+
+    def update(self) -> bool:
+        self.for_all_cells(Cell.update)
+        updated = not self.are_cells_consistent()
+        self.for_all_cells(Cell.update_ended)
         return updated
 
     def clear(self):
@@ -83,27 +92,31 @@ class Life:
             for c in row:
                 c.die()
 
-    def load(self, filepath):
-        if sum(1 for line in open(filepath, 'r')) < self.nrow:
+    def load(self, file_path: str) -> bool:
+        f = open(file_path, 'r')
+        line_array: [str] = f.read().split('\n')
+        if not self.is_loadable(line_array):
             return False
-        with open(filepath, 'r') as f:
-            i = 0
-            for line in f:
-                str = line.__str__()
-                if len(str) < self.ncolumn:
-                    return False
-                for j in range(self.ncolumn):
-                    if not (str[j] == '0' or str[j] == '1'):
-                        return False
-                    self.cells[i][j].isalive = self.cells[i][j].wasalive = int(str[j])
-                i = i + 1
-                if i == self.nrow:
-                    break
+        for i in range(self.row_count):
+            for j in range(self.column_count):
+                self.cells[i][j].is_alive = self.cells[i][j].was_alive = int(line_array[i][j])
         return True
 
-    def save(self, filepath):
-        with open(filepath, 'w') as f:
-            for row in self.cells:
-                for c in row:
-                    f.write(str(c.isalive))
-                f.write('\n')
+    def is_loadable(self, line_array: [str]) -> bool:
+        if len(line_array) != self.row_count:
+            return False
+        for line in line_array:
+            if len(line) != self.column_count:
+                return False
+            for character in line:
+                if character not in ['0', '1']:
+                    return False
+        return True
+
+    def save(self, file_path: str) -> None:
+        with open(file_path, 'w') as f:
+            for i in range(self.row_count):
+                for j in range(self.column_count):
+                    f.write(str(self.cells[i][j].is_alive))
+                if i < self.row_count - 1:
+                    f.write('\n')

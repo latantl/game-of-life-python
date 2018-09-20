@@ -1,6 +1,8 @@
+
 class Event:
+
     def __init__(self):
-        self.handlers = []
+        self.handlers: [function] = []
 
     def sub(self, handler):
         self.handlers.append(handler)

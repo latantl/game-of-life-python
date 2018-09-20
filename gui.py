@@ -1,153 +1,169 @@
 from tkinter import *
 from tkinter import messagebox, filedialog
 from tkinter.ttk import *
-from src.lifelogic import Life
+from lifelogic import *
 import os
 
-WIDTH = 641
-HEIGHT = 641
-BLACK = '#000000'
-BLUE = '#003366'
-YELLOW = '#FFFF00'
-CELLSIZE = 8
-DELAY_REF = 1000
+WIDTH: int = 641
+HEIGHT: int = 641
+BLACK: str = '#000000'
+BLUE: str = '#003366'
+YELLOW: str = '#FFFF00'
+CELL_SIZE: int = 8
+DELAY_REF: int = 1000
 DEFAULT_SPEED = 10
 MIN_SPEED = 1
 MAX_SPEED = 100
-GAME = Life(WIDTH // CELLSIZE, HEIGHT // CELLSIZE)
+GAME = Life(WIDTH // CELL_SIZE, HEIGHT // CELL_SIZE)
 
 class SettingReminder:
-    def __init__(self, value, speedsetter):
+
+    def __init__(self, value: int, speed_setter):
         self.value = value
-        self.speedsetter = speedsetter
-    def set(self, event = None):
-        self.speedsetter(self.value)
+        self.speed_setter = speed_setter
+
+    def set(self, event=None):
+        self.speed_setter(self.value)
+
 
 class LifeApp:
+
     def __init__(self):
-        self.speed = DEFAULT_SPEED
-        self.initguielements()
-        self.bindkeys()
-        self.bindcellrects()
+        self.speed: int = DEFAULT_SPEED
+        # create gui elements
+        self.tk = Tk()
+        self.frame = Frame(self.tk)
+        self.canvas = Canvas(self.frame, width=WIDTH, height=HEIGHT, bg=BLACK)
+        self.start_pause_btn = Button(self.frame, text='Start', command=self.start_pause)
+        self.step_btn = Button(self.frame, text='Step', command=self.step)
+        self.save_btn = Button(self.frame, text='Save', command=self.save)
+        self.load_btn = Button(self.frame, text='Load', command=self.load)
+        self.clear_btn = Button(self.frame, text='Clear', command=self.clear)
+        self.speed_title_lbl = Label(self.frame, text='[↑↓] Speed:')
+        self.speed_value_lbl = Label(self.frame, text=str(self.speed), width=3)
+        # setting up gui
+        self.setup_gui()
+        self.bind_gui_events()
+        self.bind_cell_rectangles()
+        # game is paused at the beginning
         self.pause()
 
-    def initguielements(self):
-        self.tk = Tk()
+    def setup_gui(self) -> None:
         self.tk.title('Game of Life')
-        self.frame = Frame(self.tk)
         self.frame.grid()
-        frame1 = Frame(self.frame)
-        frame1.grid()
-        self.canvas = Canvas(frame1, width=WIDTH, height=HEIGHT, bg=BLACK)
-        self.canvas.grid(columnspan=6)
-        self.canvas.focus_set()
-        self.canvas.bind('<Button-1>', self.switchcell)
-        self.spbutton = Button(frame1, text='Start', command=self.startpause)
-        self.spbutton.grid(row=1, column=0, sticky=N + S + E + W)
-        self.savebutton = Button(frame1, text='Save', command=self.save)
-        self.savebutton.grid(row=1, column=1, sticky=N + S + E + W)
-        self.loadbutton = Button(frame1, text='Load', command=self.load)
-        self.loadbutton.grid(row=1, column=2, sticky=N + S + E + W)
-        self.clearbutton = Button(frame1, text='Clear', command=self.clear)
-        self.clearbutton.grid(row=1, column=3, sticky=N + S + E + W)
-        self.speedtitlelabel = Label(frame1, text='[↑↓] Speed:')
-        self.speedtitlelabel.grid(row=1, column=4, sticky=E)
-        self.speedvaluelabel = Label(frame1, text=str(self.speed), width=3)
-        self.speedvaluelabel.grid(row=1, column=5, sticky=W)
+        self.canvas.grid(columnspan=7)
+        self.start_pause_btn.grid(row=1, column=0, sticky=N + S + E + W)
+        self.step_btn.grid(row=1, column=1, sticky=N + S + E + W)
+        self.save_btn.grid(row=1, column=2, sticky=N + S + E + W)
+        self.load_btn.grid(row=1, column=3, sticky=N + S + E + W)
+        self.clear_btn.grid(row=1, column=4, sticky=N + S + E + W)
+        self.speed_title_lbl.grid(row=1, column=5, sticky=E)
+        self.speed_value_lbl.grid(row=1, column=6, sticky=W)
 
-    def bindcellrects(self):
+    def bind_cell_rectangles(self) -> None:
         for row in GAME.cells:
             for c in row:
-                x = 1 + c.j * CELLSIZE
-                y = 1 + c.i * CELLSIZE
-                c.rect = self.canvas.create_rectangle(x, y, x + CELLSIZE, y + CELLSIZE, tags='cell')
-                c.bornevent.sub(self.cellborn)
-                c.diedevent.sub(self.celldied)
-        self.updatecellrects()
+                x = 1 + c.j * CELL_SIZE
+                y = 1 + c.i * CELL_SIZE
+                c.rectangle = self.canvas.create_rectangle(x, y, x + CELL_SIZE, y + CELL_SIZE, tags='cell')
+                c.born_event.sub(self.cell_born)
+                c.died_event.sub(self.cell_died)
+        self.update_cell_rectangles()
 
-    def updatecellrects(self):
+    def update_cell_rectangles(self) -> None:
         for row in GAME.cells:
             for c in row:
-                if c.isalive:
-                    self.cellborn(c)
+                if c.is_alive:
+                    self.cell_born(c)
                 else:
-                    self.celldied(c)
+                    self.cell_died(c)
 
-    def bindkeys(self):
-        self.tk.bind('<Return>', self.startpause)
+    def bind_gui_events(self) -> None:
+        self.canvas.bind('<Button-1>', self.switch_cell)
+        self.tk.bind('<Return>', self.start_pause)
+        self.tk.bind('<space>', self.step)
         self.tk.bind('<s>', self.save)
         self.tk.bind('<l>', self.load)
         self.tk.bind('<c>', self.clear)
-        self.tk.bind('<Up>', self.increasespeed)
-        self.tk.bind('<Down>', self.decreasespeed)
-        for i in range(1,10):
-            self.tk.bind(i, SettingReminder(i, self.setspeed).set)
+        self.tk.bind('<Up>', self.increase_speed)
+        self.tk.bind('<Down>', self.decrease_speed)
+        for i in range(1, 10):
+            self.tk.bind(i, SettingReminder(i, self.set_speed).set)
 
-    def setspeed(self, value):
+    def set_speed(self, value: int) -> None:
         if MIN_SPEED <= value <= MAX_SPEED:
             self.speed = value
-            self.speedvaluelabel.configure(text=str(self.speed))
+            self.speed_value_lbl.configure(text=str(self.speed))
 
-    def increasespeed(self, event = None):
-        self.setspeed(self.speed + 1)
-    def decreasespeed(self, event = None):
-        self.setspeed(self.speed - 1)
+    def increase_speed(self, event=None) -> None:
+        self.set_speed(self.speed + 1)
 
-    def cellborn(self, cell):
-        self.canvas.itemconfigure(cell.rect, fill=YELLOW)
-    def celldied(self, cell):
-        self.canvas.itemconfigure(cell.rect, fill=BLUE)
+    def decrease_speed(self, event=None) -> None:
+        self.set_speed(self.speed - 1)
 
-    def startpause(self, event = None):
-        if GAME.isrunning:
+    def cell_born(self, cell: Cell) -> None:
+        self.canvas.itemconfigure(cell.rectangle, fill=YELLOW)
+
+    def cell_died(self, cell: Cell) -> None:
+        self.canvas.itemconfigure(cell.rectangle, fill=BLUE)
+
+    def set_grid_color(self, color) -> None:
+        for row in GAME.cells:
+            for c in row:
+                self.canvas.itemconfigure(c.rectangle, outline=color)
+
+    def start_pause(self, event=None) -> None:
+        if GAME.is_running:
             self.pause()
         else:
             self.start()
 
-    def start(self):
-        GAME.isrunning = True
-        for row in GAME.cells:
-            for c in row:
-                self.canvas.itemconfigure(c.rect, outline = BLUE)
-        self.spbutton.configure(text='Pause')
-        self.runningfunc()
+    def start(self) -> None:
+        GAME.is_running = True
+        self.set_grid_color(BLUE)
+        self.start_pause_btn.configure(text='Pause')
+        self.running_func()
 
     def pause(self):
-        GAME.isrunning = False
-        for row in GAME.cells:
-            for c in row:
-                self.canvas.itemconfigure(c.rect, outline = BLACK)
-        self.spbutton.configure(text='Start')
+        GAME.is_running = False
+        self.set_grid_color(BLACK)
+        self.start_pause_btn.configure(text='Start')
 
-    def runningfunc(self):
-        if GAME.isrunning:
+    def running_func(self) -> None:
+        if GAME.is_running:
             if not GAME.update():
                 self.pause()
                 return
-            self.frame.after(DELAY_REF // self.speed, self.runningfunc)
+            self.frame.after(DELAY_REF // self.speed, self.running_func)
 
-    def save(self, event = None):
+    def step(self, event=None) -> None:
+        if GAME.is_running:
+            self.pause()
+        GAME.update()
+
+    def save(self, event=None) -> None:
         self.pause()
-        filepath = filedialog.asksaveasfilename(initialdir = os.path.join(os.getcwd(), 'saves'),
-            title = "Save file as...", filetypes = (("Game of Life states","*.life"),("all files","*.*")))
+        filepath = filedialog.asksaveasfilename(initialdir=os.path.join(os.getcwd(), 'saves'), title="Save file as...",
+                                                filetypes=(("Game of Life states", "*.life"), ("all files", "*.*")))
         if len(filepath) > 0:
             GAME.save(filepath)
 
-    def load(self, event = None):
+    def load(self, event=None) -> None:
         self.pause()
-        filepath = filedialog.askopenfilename(initialdir = os.path.join(os.getcwd(), 'saves'),
-            title = "Load file", filetypes = (("Game of Life states","*.life"),("all files","*.*")))
-        if len(filepath) > 0:
-            if GAME.load(filepath):
-                self.updatecellrects()
+        file_path = filedialog.askopenfilename(initialdir=os.path.join(os.getcwd(), 'saves'), title="Load file",
+                                               filetypes=(("Game of Life states", "*.life"), ("all files", "*.*")))
+        if len(file_path) > 0:
+            if GAME.load(file_path):
+                self.update_cell_rectangles()
 
-    def clear(self, event = None):
+    def clear(self, event=None) -> None:
         self.pause()
         if messagebox.askokcancel("Clear", "Would you like to kill all cells?"):
             GAME.clear()
 
-    def switchcell(self, event):
+    def switch_cell(self, event) -> None:
         self.pause()
-        GAME.cells[(event.y - 1)// CELLSIZE][(event.x - 1) // CELLSIZE].switch()
+        GAME.cells[(event.y - 1) // CELL_SIZE][(event.x - 1) // CELL_SIZE].switch()
+
 
 LifeApp().tk.mainloop()
