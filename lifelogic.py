@@ -100,6 +100,7 @@ class Life:
         for i in range(self.row_count):
             for j in range(self.column_count):
                 self.cells[i][j].is_alive = self.cells[i][j].was_alive = int(line_array[i][j])
+        f.close()
         return True
 
     def is_loadable(self, line_array: [str]) -> bool:
