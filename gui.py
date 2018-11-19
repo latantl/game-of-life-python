@@ -165,6 +165,7 @@ class LifeApp:
     def switch_cell(self, event) -> None:
         self.pause()
         GAME.cells[(event.y - 1) // CELL_SIZE][(event.x - 1) // CELL_SIZE].switch()
+        self.frame.tkraise()
 
 
 LifeApp().tk.mainloop()
